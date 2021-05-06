@@ -1,15 +1,5 @@
-# Ministry of Justice Template Repository
+# Cloud Platform Git Arguments
 
-Use this template to [create a repository] with the default initial files for a Ministry of Justice Github repository, including:
+This repository takes a blob of repository names, pulls them down locally and performs the command of your choosing. After this command succeeds it will commit the change and create a pull request.
 
-* The correct LICENSE
-* Github actions
-* .gitignore file
-
-Once you have created your repository, please:
-
-* Edit the copy of this README.md file to document your project
-* Grant permissions to the appropriate MoJ teams
-* Setup branch protection
-
-[create a repository]: https://github.com/ministryofjustice/template-repository/generate
+This is repository is a work in progress so will be changing frequently.
