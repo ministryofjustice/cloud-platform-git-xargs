@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -64,12 +65,20 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 		}
 
 		// Clone repositories to disk
+		var wg sync.WaitGroup
 		for _, repo := range repos {
-			_, _, err = clone(repo, client)
-			if err != nil {
-				return err
-			}
+			wg.Add(1)
+			go func(repo *github.Repository, client *github.Client) error {
+				defer wg.Done()
+
+				repoDir, localRepo, err = clone(repo, client)
+				if err != nil {
+					return err
+				}
+				return nil
+			}(repo, client)
 		}
+		wg.Wait()
 
 		// err = execute(command)
 		// if err != nil {
@@ -148,7 +157,6 @@ func clone(repo *github.Repository, token *github.Client) (string, *git.Reposito
 	if err != nil {
 		return "", nil, err
 	}
-	fmt.Println(repoDir)
 
 	localRepo, err := git.PlainClone(repoDir, false, &git.CloneOptions{
 		URL: repo.GetCloneURL(),
