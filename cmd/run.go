@@ -19,9 +19,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/go-github/v35/github"
 	"github.com/spf13/cobra"
 )
@@ -42,27 +45,31 @@ to main.
 
 An example of this would be:
 
-$cloud-platform-git-xargs run --command "touch blankfile" \
+cloud-platform-git-xargs run --command "touch blankfile" \
 															--organisation "github" \
 															--repository "github"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		token := os.Getenv("GITHUB_OAUTH_TOKEN")
 		if os.Getenv("GITHUB_OAUTH_TOKEN") == "" {
-			return errors.New("You must have the GITHUB_OAUTH_TOKEN")
+			return errors.New("You must have the GITHUB_OAUTH_TOKEN env var")
 		}
 
+		// Create GH client using your personal access token
 		client := GitHubClient(token)
 
-		r, err := fetchRepositories(client, org, repos)
+		// Get repository names
+		repos, err := fetchRepositories(client, org, repos)
 		if err != nil {
 			return err
 		}
-		fmt.Println(r)
 
-		// err = clone(r)
-		// if err != nil {
-		// 	return
-		// }
+		// Clone repositories to disk
+		for _, repo := range repos {
+			_, _, err = clone(repo, client)
+			if err != nil {
+				return err
+			}
+		}
 
 		// err = execute(command)
 		// if err != nil {
@@ -88,9 +95,10 @@ func init() {
 	runCmd.Flags().BoolVarP(&commit, "skip-commit", "s", false, "whether or not you want to create a commit and PR.")
 }
 
-func fetchRepositories(client *github.Client, org, blob string) (l []string, err error) {
+func fetchRepositories(client *github.Client, org, blob string) ([]*github.Repository, error) {
 	ctx := context.Background()
 	opt := &github.RepositoryListByOrgOptions{
+		Sort:        "full_name",
 		Type:        "public",
 		ListOptions: github.ListOptions{PerPage: 10},
 	}
@@ -111,13 +119,47 @@ func fetchRepositories(client *github.Client, org, blob string) (l []string, err
 		opt.Page = resp.NextPage
 	}
 
-	// Loop over all repositories and grab only matching repositories.
+	var list []*github.Repository
 	for _, repo := range allRepos {
-		c := string(*repo.FullName)
-		if strings.Contains(c, blob) {
-			l = append(l, c)
+		if strings.Contains(*repo.FullName, blob) {
+			list = append(list, repo)
 		}
 	}
 
-	return l, nil
+	return list, nil
+}
+
+// func binarySearch(a []*github.Repository, b string) []*github.Repository {
+// 	start := 0
+// 	end := len(a)-1
+// 	mid := len(a) / 2
+
+// 	for start <= end {
+// 		value := a[mid]
+
+// 		if strings.Contains(b, )
+// 	}
+
+// }
+
+func clone(repo *github.Repository, token *github.Client) (string, *git.Repository, error) {
+	// Create temporary directory on disk
+	repoDir, err := ioutil.TempDir("./tmp", fmt.Sprintf(repo.GetName()))
+	if err != nil {
+		return "", nil, err
+	}
+	fmt.Println(repoDir)
+
+	localRepo, err := git.PlainClone(repoDir, false, &git.CloneOptions{
+		URL: repo.GetCloneURL(),
+		Auth: &http.BasicAuth{
+			Username: repo.GetOwner().GetLogin(),
+			Password: os.Getenv("GITHUB_OAUTH_TOKEN"),
+		},
+	})
+	if err != nil {
+		return repoDir, nil, err
+	}
+
+	return repoDir, localRepo, nil
 }
