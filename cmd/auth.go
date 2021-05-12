@@ -7,25 +7,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// ent, error) {
-// 	// Ensure user provided a GITHUB_OAUTH_TOKEN
-// 	GithubOauthToken := os.Getenv("GITHUB_OAUTH_TOKEN")
-// 	if GithubOauthToken == "" {
-// 		return nil, errors.New("You must have the GITHUB_OAUTH_TOKEN mapped")
-// 	}
-
-// 	ts := oauth2.StaticTokenSource(
-// 		&oauth2.Token{AccessToken: GithubOauthToken},
-// 	)
-
-// 	tc := oauth2.NewClient(context.Background(), ts)
-
-// 	// Wrap the go-github client in a GithubClient struct, which is common between production and test code
-// 	client := NewClient(github.NewClient(tc))
-
-// 	return client
-// }
-
+// GitHubClient takes a GitHub personal access key as a string and builds
+// and returns a GitHub client to the caller.
 func GitHubClient(token string) *github.Client {
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
