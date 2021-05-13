@@ -19,10 +19,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/go-git/go-git/v5/plumbing"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -31,9 +36,9 @@ import (
 )
 
 var (
-	command    []string
-	repos, org string
-	commit     bool
+	command      string
+	repos, org   string
+	commit, loop bool
 )
 
 // runCmd represents the run command
@@ -71,10 +76,38 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 			go func(repo *github.Repository, client *github.Client) error {
 				defer wg.Done()
 
-				repoDir, localRepo, err = clone(repo, client)
+				// Clone repository to local disk
+				repoDir, localRepo, err := clone(repo, client)
 				if err != nil {
 					return err
 				}
+
+				// Get HEAD ref from repository
+				ref, err := localRepo.Head()
+				if err != nil {
+					return err
+				}
+
+				// Get the worktree for the local repository
+				tree, err := localRepo.Worktree()
+				if err != nil {
+					return err
+				}
+
+				// Create local branch
+				branch, err := checkout(client, ref, tree, repo, localRepo)
+				if err != nil {
+					return err
+				}
+				fmt.Println(branch, repoDir)
+
+				// Execute command
+				err = executeCommand(repoDir, command, tree)
+				if err != nil {
+					return err
+				}
+				// Commit
+				// PR
 				return nil
 			}(repo, client)
 		}
@@ -98,10 +131,72 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 func init() {
 	rootCmd.AddCommand(runCmd)
 
-	runCmd.Flags().StringSliceVarP(&command, "command", "c", []string{}, "the command you'd like to execute i.e. touch file")
+	runCmd.Flags().StringVarP(&command, "command", "c", "", "the command you'd like to execute i.e. touch file")
 	runCmd.Flags().StringVarP(&repos, "repository", "r", "cloud-platform-environments", "a blob of the repository name i.e. cloud-platform-terraform")
 	runCmd.Flags().StringVarP(&org, "organisation", "o", "ministryofjustice", "organisation of the repository i.e. ministryofjustice")
 	runCmd.Flags().BoolVarP(&commit, "skip-commit", "s", false, "whether or not you want to create a commit and PR.")
+	runCmd.Flags().BoolVarP(&loop, "loop-dir", "l", false, "if you wish to execute the command on every directory in repository.")
+}
+
+func executeCommand(dir, command string, tree *git.Worktree) error {
+	if len(command) < 1 {
+		return errors.New("no command executed")
+	}
+
+	if loop {
+		err := filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				cmd := exec.Command("/bin/sh", "-c", command)
+				cmd.Dir = filepath.Dir(path) + "/" + info.Name()
+				err := cmd.Run()
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		cmd := exec.Command("/bin/sh", "-c", command)
+		cmd.Dir = dir
+		err := cmd.Run()
+		if err != nil {
+			return err
+		}
+	}
+
+	status, err := tree.Status()
+	if err != nil {
+		return err
+	}
+
+	if !status.IsClean() {
+		return errors.New("repository worktree is no longer clean. Stage new files and commit")
+	}
+
+	return nil
+}
+
+func checkout(client *github.Client, ref *plumbing.Reference, tree *git.Worktree, remote *github.Repository, local *git.Repository) (plumbing.ReferenceName, error) {
+	branchName := plumbing.NewBranchReferenceName("update")
+
+	create := &git.CheckoutOptions{
+		Hash:   ref.Hash(),
+		Branch: branchName,
+		Create: true,
+	}
+
+	err := tree.Checkout(create)
+	if err != nil {
+		return "", err
+	}
+
+	return branchName, nil
 }
 
 func fetchRepositories(client *github.Client, org, blob string) ([]*github.Repository, error) {
