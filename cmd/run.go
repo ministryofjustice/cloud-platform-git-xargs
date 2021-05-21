@@ -25,7 +25,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/go-git/go-git/v5/plumbing"
 
@@ -36,9 +35,9 @@ import (
 )
 
 var (
-	command      string
-	repos, org   string
-	commit, loop bool
+	command, message string
+	repos, org       string
+	skipCommit, loop bool
 )
 
 // runCmd represents the run command
@@ -57,7 +56,7 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 	RunE: func(cmd *cobra.Command, args []string) error {
 		token := os.Getenv("GITHUB_OAUTH_TOKEN")
 		if os.Getenv("GITHUB_OAUTH_TOKEN") == "" {
-			return errors.New("You must have the GITHUB_OAUTH_TOKEN env var")
+			return errors.New("you must have the GITHUB_OAUTH_TOKEN env var")
 		}
 
 		// Create GH client using your personal access token
@@ -70,60 +69,55 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 		}
 
 		// Clone repositories to disk
-		var wg sync.WaitGroup
+		// var wg sync.WaitGroup
 		for _, repo := range repos {
-			wg.Add(1)
-			go func(repo *github.Repository, client *github.Client) error {
-				defer wg.Done()
+			// 	wg.Add(1)
+			// 	go func(repo *github.Repository, client *github.Client) error {
+			// defer wg.Done()
 
-				// Clone repository to local disk
-				repoDir, localRepo, err := clone(repo, client)
+			// Clone repository to local disk
+			repoDir, localRepo, err := clone(repo, client)
+			if err != nil {
+				return err
+			}
+
+			// Get HEAD ref from repository
+			ref, err := localRepo.Head()
+			if err != nil {
+				return err
+			}
+
+			// Get the worktree for the local repository
+			tree, err := localRepo.Worktree()
+			if err != nil {
+				return err
+			}
+
+			// Create local branch
+			branch, err := checkout(client, ref, tree, repo, localRepo)
+			if err != nil {
+				return err
+			}
+
+			// Execute command
+			err = executeCommand(repoDir, command, tree)
+			if err != nil {
+				return err
+			}
+
+			if !skipCommit {
+				err = pushChanges(client, branch.String(), tree, repoDir, localRepo, repo)
 				if err != nil {
 					return err
 				}
-
-				// Get HEAD ref from repository
-				ref, err := localRepo.Head()
-				if err != nil {
-					return err
-				}
-
-				// Get the worktree for the local repository
-				tree, err := localRepo.Worktree()
-				if err != nil {
-					return err
-				}
-
-				// Create local branch
-				branch, err := checkout(client, ref, tree, repo, localRepo)
-				if err != nil {
-					return err
-				}
-				fmt.Println(branch, repoDir)
-
-				// Execute command
-				err = executeCommand(repoDir, command, tree)
-				if err != nil {
-					return err
-				}
-				// Commit
-				// PR
-				return nil
-			}(repo, client)
+			}
 		}
-		wg.Wait()
-
-		// err = execute(command)
-		// if err != nil {
-		// 	return
+		// 		// PR
+		// 		return nil
+		// 	}(repo, client)
 		// }
+		// wg.Wait()
 
-		// if commit {
-		// 	err = commit(repo)
-		// 	if err != nil {
-		// 		return
-		// 	}
-		// }
 		return nil
 	},
 }
@@ -134,8 +128,38 @@ func init() {
 	runCmd.Flags().StringVarP(&command, "command", "c", "", "the command you'd like to execute i.e. touch file")
 	runCmd.Flags().StringVarP(&repos, "repository", "r", "cloud-platform-environments", "a blob of the repository name i.e. cloud-platform-terraform")
 	runCmd.Flags().StringVarP(&org, "organisation", "o", "ministryofjustice", "organisation of the repository i.e. ministryofjustice")
-	runCmd.Flags().BoolVarP(&commit, "skip-commit", "s", false, "whether or not you want to create a commit and PR.")
+	runCmd.Flags().StringVarP(&message, "commit", "m", "perform command on repository", "the commit message you'd like to make")
+	runCmd.Flags().BoolVarP(&skipCommit, "skip-commit", "s", false, "whether or not you want to create a commit and PR.")
 	runCmd.Flags().BoolVarP(&loop, "loop-dir", "l", false, "if you wish to execute the command on every directory in repository.")
+}
+
+func pushChanges(client *github.Client, branch string, tree *git.Worktree, repo string, localRepo *git.Repository, remoteRepo *github.Repository) error {
+	status, err := tree.Status()
+	if err != nil {
+		return err
+	}
+
+	if status.IsClean() {
+		return errors.New("warning: no changes to commit")
+	}
+
+	for path := range status {
+		if status.IsUntracked(path) {
+			_, err := tree.Add(path)
+			if err != nil {
+				return nil
+			}
+		}
+	}
+
+	_, err = tree.Commit(message, &git.CommitOptions{
+		All: true,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func executeCommand(dir, command string, tree *git.Worktree) error {
@@ -143,6 +167,7 @@ func executeCommand(dir, command string, tree *git.Worktree) error {
 		return errors.New("no command executed")
 	}
 
+	// if the loop switch is set to true, the chosen command will execute in every directory.
 	if loop {
 		err := filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
 			if err != nil {
@@ -170,14 +195,14 @@ func executeCommand(dir, command string, tree *git.Worktree) error {
 		}
 	}
 
-	status, err := tree.Status()
-	if err != nil {
-		return err
-	}
+	// status, err := tree.Status()
+	// if err != nil {
+	// 	return err
+	// }
 
-	if !status.IsClean() {
-		return errors.New("repository worktree is no longer clean. Stage new files and commit")
-	}
+	// if !status.IsClean() {
+	// 	return errors.New("repository worktree is no longer clean. Stage new files and commit")
+	// }
 
 	return nil
 }
@@ -249,6 +274,7 @@ func fetchRepositories(client *github.Client, org, blob string) ([]*github.Repos
 func clone(repo *github.Repository, token *github.Client) (string, *git.Repository, error) {
 	// Create temporary directory on disk
 	repoDir, err := ioutil.TempDir("./tmp", fmt.Sprintf(repo.GetName()))
+
 	if err != nil {
 		return "", nil, err
 	}
