@@ -2,7 +2,7 @@
 
 ## Problem statement
 
-While trying to upgrade the terraform estate across the whole [cloud platform]() estate we noticed a number of repetitive steps that could be automated. We had to manually:
+While trying to upgrade the terraform estate across the whole [cloud platform](https://github.com/ministryofjustice/cloud-platform) estate we noticed a number of repetitive steps that could be automated. We had to manually:
 
 - Clone a repository
 - Run `terraform 0.13upgrade`
@@ -11,16 +11,16 @@ While trying to upgrade the terraform estate across the whole [cloud platform]()
 
 We have two fundamental constraints when performing the above:
 
-- We have over 50 repositories with the name `cloud-platform-*` that contain terraform HCL.
+- We have over 50 repositories with the name `cloud-platform-terraform*` that contain terraform HCL.
 - We maintain a multi-tenant Kubernetes cluster with both production and non-production code.
 
 We need the ability to pass a pattern of a repository name, such as `*terraform`, as an argument to a cli with the ability to also skip and cherry pick commits to craft a pull request. As the Ministry of Justice run a multi-tenancy Kubernetes cluster with both production and non-production code, sometimes it's important to slice up your PR, only commiting certain changes that effect non-production namespaces and leave others. So having the autonomy to commit to my local machine and cherry pick which changes I need is essential.
 
 ### What tools are currently out there
 
-There is a really magnificent repository called [git-xargs](). This tool performs the clone, run, push and pr abilities of the code in this repository. It doesn't however let us pass our repository name pattern and the skip feature doesn't allow you to go back and automate your PR creation later.
+There's a really magnificent repository called [git-xargs](https://github.com/gruntwork-io/git-xargs/). This tool performs the clone, run, push and pr abilities of the code in this repository. It doesn't however let us pass our repository name pattern and the skip feature doesn't allow you to go back and automate your PR creation later.
 
-We also decided to use the [cobra]() cli package as the team maintaining this repository will have experience using this tool. The maintainers of this repository will keep a close eye on the [git-xargs]() repository and close this repository if the feature set begins to align further.
+We also decided to use the [cobra](https://github.com/spf13/cobra) cli package as the team maintaining this repository will have experience using this tool. The maintainers of this repository will keep a close eye on the [git-xargs](https://github.com/gruntwork-io/git-xargs/) and will close our repository down if the feature set begins to align further.
 
 ## How to use it
 
