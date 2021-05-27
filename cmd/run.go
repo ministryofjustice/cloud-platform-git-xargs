@@ -112,7 +112,6 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 				}
 			}
 		}
-		// 		// PR
 		// 		return nil
 		// 	}(repo, client)
 		// }
@@ -134,6 +133,7 @@ func init() {
 }
 
 func pushChanges(client *github.Client, branch string, tree *git.Worktree, repo string, localRepo *git.Repository, remoteRepo *github.Repository) error {
+	defaultBranch := remoteRepo.GetDefaultBranch()
 	status, err := tree.Status()
 	if err != nil {
 		return err
@@ -155,6 +155,28 @@ func pushChanges(client *github.Client, branch string, tree *git.Worktree, repo 
 	_, err = tree.Commit(message, &git.CommitOptions{
 		All: true,
 	})
+	if err != nil {
+		return err
+	}
+
+	err = localRepo.Push(&git.PushOptions{
+		RemoteName: "origin",
+		Auth: &http.BasicAuth{
+			Username: remoteRepo.GetOwner().GetLogin(),
+			Password: os.Getenv("GITHUB_OAUTH_TOKEN"),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	createPR := &github.NewPullRequest{
+		Title: github.String(message),
+		Head:  github.String(branch),
+		Base:  github.String(defaultBranch),
+	}
+
+	_, _, err = client.PullRequests.Create(context.Background(), *remoteRepo.GetOwner().Login, remoteRepo.GetName(), createPR)
 	if err != nil {
 		return err
 	}
