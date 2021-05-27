@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// All passed via flags
 var (
 	command, message string
 	repos, org       string
@@ -51,9 +52,10 @@ to main.
 An example of this would be:
 
 cloud-platform-git-xargs run --command "touch blankfile" \
-															--organisation "github" \
-															--repository "github"`,
+							 --organisation "github" \
+							 --repository "github"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// GITHUB_OAUTH_TOKEN must be set
 		token := os.Getenv("GITHUB_OAUTH_TOKEN")
 		if os.Getenv("GITHUB_OAUTH_TOKEN") == "" {
 			return errors.New("you must have the GITHUB_OAUTH_TOKEN env var")
@@ -62,13 +64,13 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 		// Create GH client using your personal access token
 		client := GitHubClient(token)
 
-		// Get repository names
+		// Get all repository names containing value to repos variable/flag
 		repos, err := fetchRepositories(client, org, repos)
 		if err != nil {
 			return err
 		}
 
-		// Clone repositories to disk
+		// Loop over all repositories and perform operations
 		// var wg sync.WaitGroup
 		for _, repo := range repos {
 			// 	wg.Add(1)
@@ -105,6 +107,7 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 				return err
 			}
 
+			// As long as skipCommit isn't true, stage, push and pr changes
 			if !skipCommit {
 				err = pushChanges(client, branch.String(), tree, repoDir, localRepo, repo)
 				if err != nil {
@@ -132,6 +135,8 @@ func init() {
 	runCmd.Flags().BoolVarP(&loop, "loop-dir", "l", false, "if you wish to execute the command on every directory in repository.")
 }
 
+// pushChanges takes a GitHub client, a branch, tree and repository. It first adds all changes to the git staging area, then commits,
+// pushes and creates a PR, outputting any errors.
 func pushChanges(client *github.Client, branch string, tree *git.Worktree, repo string, localRepo *git.Repository, remoteRepo *github.Repository) error {
 	defaultBranch := remoteRepo.GetDefaultBranch()
 	status, err := tree.Status()
@@ -184,6 +189,10 @@ func pushChanges(client *github.Client, branch string, tree *git.Worktree, repo 
 	return nil
 }
 
+// executeCommand takes a directory path, a command to execute and a git
+// worktree. If a loop is specified, it'll execute the command argument on
+// every directory. Otherwise it'll just execute once on the root of the
+// repository. It outputs an error if found.
 func executeCommand(dir, command string, tree *git.Worktree) error {
 	if len(command) < 1 {
 		return errors.New("no command executed")
@@ -216,19 +225,11 @@ func executeCommand(dir, command string, tree *git.Worktree) error {
 			return err
 		}
 	}
-
-	// status, err := tree.Status()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if !status.IsClean() {
-	// 	return errors.New("repository worktree is no longer clean. Stage new files and commit")
-	// }
-
 	return nil
 }
 
+// checkout takes a GitHub client, a git reference and tree, along with local and remote repository.
+// It will create a branch with the hardcoded name 'update', and will output a new git reference.
 func checkout(client *github.Client, ref *plumbing.Reference, tree *git.Worktree, remote *github.Repository, local *git.Repository) (plumbing.ReferenceName, error) {
 	branchName := plumbing.NewBranchReferenceName("update")
 
@@ -246,6 +247,8 @@ func checkout(client *github.Client, ref *plumbing.Reference, tree *git.Worktree
 	return branchName, nil
 }
 
+// fetchRepositories takes a GitHub client, an org and a pattern/blob of a repository. It will query
+// the GitHub API for all public occurrences of the pattern. It will return a list of GitHub repositories.
 func fetchRepositories(client *github.Client, org, blob string) ([]*github.Repository, error) {
 	ctx := context.Background()
 	opt := &github.RepositoryListByOrgOptions{
@@ -280,19 +283,9 @@ func fetchRepositories(client *github.Client, org, blob string) ([]*github.Repos
 	return list, nil
 }
 
-// func binarySearch(a []*github.Repository, b string) []*github.Repository {
-// 	start := 0
-// 	end := len(a)-1
-// 	mid := len(a) / 2
-
-// 	for start <= end {
-// 		value := a[mid]
-
-// 		if strings.Contains(b, )
-// 	}
-
-// }
-
+// Clone takes a GitHub repository and client. It will look to create a local copy of the
+// repository in the `tmp/` directory. It will then output the repository directory, name and
+// an error if there is one.
 func clone(repo *github.Repository, token *github.Client) (string, *git.Repository, error) {
 	// Create temporary directory on disk
 	repoDir, err := ioutil.TempDir("./tmp", fmt.Sprintf(repo.GetName()))
