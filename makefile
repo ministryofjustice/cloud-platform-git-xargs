@@ -1,7 +1,7 @@
 NAME := crypto
 SOURCE_FILES := $(shell find * -name '*.go')
 GIT_COMMIT := $(shell git describe --dirty --always)
-VERSION := 0.1
+VERSION := 1.2
 
 crypto: $(SOURCE_FILES)
 	go mod download
