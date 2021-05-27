@@ -287,9 +287,14 @@ func fetchRepositories(client *github.Client, org, blob string) ([]*github.Repos
 // repository in the `tmp/` directory. It will then output the repository directory, name and
 // an error if there is one.
 func clone(repo *github.Repository, token *github.Client) (string, *git.Repository, error) {
+	tmpDir := "./tmp"
+	if _, err := os.Stat(tmpDir); os.IsNotExist(err) {
+		file := filepath.Join(".", tmpDir)
+		os.MkdirAll(file, os.ModePerm)
+	}
+
 	// Create temporary directory on disk
 	repoDir, err := ioutil.TempDir("./tmp", fmt.Sprintf(repo.GetName()))
-
 	if err != nil {
 		return "", nil, err
 	}
