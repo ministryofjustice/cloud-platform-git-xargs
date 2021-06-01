@@ -7,9 +7,9 @@ import (
 	"github.com/google/go-github/v35/github"
 )
 
-// fetchRepositories takes a GitHub client, an org and a pattern/blob of a repository. It will query
+// FetchRepositories takes a GitHub client, an org and a pattern/blob of a repository. It will query
 // the GitHub API for all public occurrences of the pattern. It will return a list of GitHub repositories.
-func fetchRepositories(client *github.Client, org, blob string) ([]*github.Repository, error) {
+func FetchRepositories(client *github.Client, org, blob string) ([]*github.Repository, error) {
 	ctx := context.Background()
 	opt := &github.RepositoryListByOrgOptions{
 		Sort:        "full_name",

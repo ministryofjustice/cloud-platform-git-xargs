@@ -24,9 +24,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/get"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/transport/http"
@@ -65,7 +65,7 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 		client := GitHubClient(token)
 
 		// Get all repository names containing value to repos variable/flag
-		repos, err := fetchRepositories(client, org, repos)
+		repos, err := get.FetchRepositories(client, org, repos)
 		if err != nil {
 			return err
 		}
@@ -245,42 +245,6 @@ func checkout(client *github.Client, ref *plumbing.Reference, tree *git.Worktree
 	}
 
 	return branchName, nil
-}
-
-// fetchRepositories takes a GitHub client, an org and a pattern/blob of a repository. It will query
-// the GitHub API for all public occurrences of the pattern. It will return a list of GitHub repositories.
-func fetchRepositories(client *github.Client, org, blob string) ([]*github.Repository, error) {
-	ctx := context.Background()
-	opt := &github.RepositoryListByOrgOptions{
-		Sort:        "full_name",
-		Type:        "public",
-		ListOptions: github.ListOptions{PerPage: 10},
-	}
-
-	// Becuase of the potential number of org repositories pagination is added.
-	// Warning: this can take a while if the org contains a number of repositories.
-	var allRepos []*github.Repository
-	for {
-		repos, resp, err := client.Repositories.ListByOrg(ctx, org, opt)
-		if err != nil {
-			return nil, err
-		}
-
-		allRepos = append(allRepos, repos...)
-		if resp.NextPage == 0 {
-			break
-		}
-		opt.Page = resp.NextPage
-	}
-
-	var list []*github.Repository
-	for _, repo := range allRepos {
-		if strings.Contains(*repo.FullName, blob) {
-			list = append(list, repo)
-		}
-	}
-
-	return list, nil
 }
 
 // Clone takes a GitHub repository and client. It will look to create a local copy of the
