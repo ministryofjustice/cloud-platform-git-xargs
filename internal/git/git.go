@@ -1,4 +1,4 @@
-package gitAction
+package git
 
 import (
 	"context"

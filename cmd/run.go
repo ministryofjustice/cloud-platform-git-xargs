@@ -17,15 +17,14 @@ package cmd
 
 import (
 	"errors"
-	"io/fs"
 	"os"
-	"os/exec"
-	"path/filepath"
 
 	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/get"
+	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/git"
 	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/gitAction"
 
-	"github.com/go-git/go-git/v5"
+	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/execute"
+
 	"github.com/spf13/cobra"
 )
 
@@ -73,7 +72,7 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 			// defer wg.Done()
 
 			// Clone repository to local disk
-			repoDir, localRepo, err := gitAction.Clone(repo, client)
+			repoDir, localRepo, err := git.Clone(repo, client)
 			if err != nil {
 				return err
 			}
@@ -91,13 +90,13 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 			}
 
 			// Create local branch
-			branch, err := gitAction.Checkout(client, ref, tree, repo, localRepo)
+			branch, err := git.Checkout(client, ref, tree, repo, localRepo)
 			if err != nil {
 				return err
 			}
 
 			// Execute command
-			err = executeCommand(repoDir, command, tree)
+			err = execute.Command(repoDir, command, tree, loop)
 			if err != nil {
 				return err
 			}
@@ -128,43 +127,4 @@ func init() {
 	runCmd.Flags().StringVarP(&message, "commit", "m", "perform command on repository", "the commit message you'd like to make")
 	runCmd.Flags().BoolVarP(&skipCommit, "skip-commit", "s", false, "whether or not you want to create a commit and PR.")
 	runCmd.Flags().BoolVarP(&loop, "loop-dir", "l", false, "if you wish to execute the command on every directory in repository.")
-}
-
-// executeCommand takes a directory path, a command to execute and a git
-// worktree. If a loop is specified, it'll execute the command argument on
-// every directory. Otherwise it'll just execute once on the root of the
-// repository. It outputs an error if found.
-func executeCommand(dir, command string, tree *git.Worktree) error {
-	if len(command) < 1 {
-		return errors.New("no command executed")
-	}
-
-	// if the loop switch is set to true, the chosen command will execute in every directory.
-	if loop {
-		err := filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if info.IsDir() {
-				cmd := exec.Command("/bin/sh", "-c", command)
-				cmd.Dir = filepath.Dir(path) + "/" + info.Name()
-				err := cmd.Run()
-				if err != nil {
-					return err
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-	} else {
-		cmd := exec.Command("/bin/sh", "-c", command)
-		cmd.Dir = dir
-		err := cmd.Run()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
