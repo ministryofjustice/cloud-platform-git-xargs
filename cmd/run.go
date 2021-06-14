@@ -21,7 +21,6 @@ import (
 
 	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/get"
 	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/git"
-	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/gitAction"
 
 	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/execute"
 
@@ -103,7 +102,7 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 
 			// As long as skipCommit isn't true, stage, push and pr changes
 			if !skipCommit {
-				err = gitAction.PushChanges(client, branch.String(), tree, repoDir, message, localRepo, repo)
+				err = git.PushChanges(client, branch.String(), tree, repoDir, message, localRepo, repo)
 				if err != nil {
 					return err
 				}
