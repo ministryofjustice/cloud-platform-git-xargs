@@ -9,11 +9,11 @@ import (
 	"github.com/go-git/go-git/v5"
 )
 
-// executeCommand takes a directory path, a command to execute and a git
+// Command takes a directory path, a command to execute and a git
 // worktree. If a loop is specified, it'll execute the command argument on
 // every directory. Otherwise it'll just execute once on the root of the
 // repository. It outputs an error if found.
-func executeCommand(dir, command string, tree *git.Worktree, loop bool) error {
+func Command(dir, command string, tree *git.Worktree, loop bool) error {
 	if len(command) < 1 {
 		return errors.New("no command executed")
 	}
