@@ -1,4 +1,5 @@
 [![Build status](https://github.com/ministryofjustice/cloud-platform-git-xargs/actions/workflows/release.yaml/badge.svg)](https://github.com/ministryofjustice/cloud-platform-git-xargs/actions/workflows/release.yaml)
+[![tests](https://github.com/ministryofjustice/cloud-platform-git-xargs//workflows/tests/badge.svg)](https://github.com/ministryofjustice/cloud-platform-git-xargs/actions?query=workflow%3A%22tests%22)
 
 ## Problem statement
 
