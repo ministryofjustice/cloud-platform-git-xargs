@@ -17,14 +17,16 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
-	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/get"
-	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/git"
+	"github.com/google/go-github/v35/github"
+	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/execute"
-
-	"github.com/spf13/cobra"
+	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/get"
+	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/git"
 )
 
 // All passed via flags
@@ -34,7 +36,9 @@ var (
 	skipCommit, loop bool
 )
 
-// runCmd represents the run command
+// runCmd represents the run command. This command, with arguments,
+// will enable the user to run a command against a collection of repositories.
+// Commit that change and then create a pull request.
 var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Executes a cli command on a collection of repositories.",
@@ -48,7 +52,7 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 							 --organisation "github" \
 							 --repository "github"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// GITHUB_OAUTH_TOKEN must be set
+		// You must set a GITHUB_OAUTH_TOKEN environment variable
 		token := os.Getenv("GITHUB_OAUTH_TOKEN")
 		if os.Getenv("GITHUB_OAUTH_TOKEN") == "" {
 			return errors.New("you must have the GITHUB_OAUTH_TOKEN env var")
@@ -63,58 +67,65 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 			return err
 		}
 
-		// Loop over all repositories and perform operations
-		// var wg sync.WaitGroup
+		// Loop over all repositories, run a command, commit the change and
+		// create a pull request. Decided to use errgroup instead of waitgroups
+		// as it was easier to understand.
+		g := new(errgroup.Group)
 		for _, repo := range repos {
-			// 	wg.Add(1)
-			// 	go func(repo *github.Repository, client *github.Client) error {
-			// defer wg.Done()
-
-			// Clone repository to local disk
-			repoDir, localRepo, err := git.Clone(repo, client)
-			if err != nil {
-				return err
-			}
-
-			// Get HEAD ref from repository
-			ref, err := localRepo.Head()
-			if err != nil {
-				return err
-			}
-
-			// Get the worktree for the local repository
-			tree, err := localRepo.Worktree()
-			if err != nil {
-				return err
-			}
-
-			// Create local branch
-			branch, err := git.Checkout(client, ref, tree, repo, localRepo)
-			if err != nil {
-				return err
-			}
-
-			// Execute command
-			err = execute.Command(repoDir, command, tree, loop)
-			if err != nil {
-				return err
-			}
-
-			// As long as skipCommit isn't true, stage, push and pr changes
-			if !skipCommit {
-				err = git.PushChanges(client, branch.String(), tree, repoDir, message, localRepo, repo)
+			g.Go(func() error {
+				err = processRepo(repo, client)
 				if err != nil {
 					return err
 				}
-			}
+				return err
+			})
 		}
-		// 		return nil
-		// 	}(repo, client)
-		// }
-		// wg.Wait()
-
+		if err := g.Wait(); err != nil {
+			fmt.Println("Error processing repositories", err)
+		}
 		return nil
 	},
+}
+
+func processRepo(repo *github.Repository, client *github.Client) error {
+	// Clone repository to local disk
+	repoDir, localRepo, err := git.Clone(repo, client)
+	if err != nil {
+		return err
+	}
+
+	// Get HEAD ref from repository
+	ref, err := localRepo.Head()
+	if err != nil {
+		return err
+	}
+
+	// Get the worktree for the local repository
+	tree, err := localRepo.Worktree()
+	if err != nil {
+		return err
+	}
+
+	// Create local branch
+	branch, err := git.Checkout(client, ref, tree, repo, localRepo)
+	if err != nil {
+		return err
+	}
+
+	// Execute command
+	err = execute.Command(repoDir, command, tree, loop)
+	if err != nil {
+		return err
+	}
+
+	// As long as skipCommit isn't true, stage, push and pr changes
+	if !skipCommit {
+		err = git.PushChanges(client, branch.String(), tree, repoDir, message, localRepo, repo)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func init() {
