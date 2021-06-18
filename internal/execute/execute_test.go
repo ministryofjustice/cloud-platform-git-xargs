@@ -1,6 +1,9 @@
 package execute
 
 import (
+	"io/fs"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/go-github/v35/github"
@@ -41,7 +44,24 @@ func TestCommand(t *testing.T) {
 		t.Error("When provided with an empty string; want fail, got continue")
 	}
 
-	// test: if loop == true it creates more than one file
+	// Will pass if a file called file.md exists in each directory.
+	err = Command(repoDir, "touch file.md", tree, true)
+	if err != nil {
+		t.Error("Unable to run command. Fail.")
+	}
+
+	_ = filepath.Walk(repoDir, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			t.Error("Unable to walk the tree. Fail.")
+		}
+		if info.IsDir() {
+			_, err = os.Stat(path + "/file.md")
+			if os.IsNotExist(err) {
+				t.Error("Loop has NOT created file.md in directory. Fail.", path)
+			}
+		}
+		return nil
+	})
 	// test: if loop == false it creates only one file
 	// test: if I pass a bad command, it fails.
 }
