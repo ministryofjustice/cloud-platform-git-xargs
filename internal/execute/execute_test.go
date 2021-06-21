@@ -1,8 +1,8 @@
 package execute
 
 import (
-	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -40,12 +40,22 @@ func createMock() (repoDir string, tree *git.Worktree) {
 	return
 }
 
+// cleanUp simply removes the directory created by the Clone function.
+func cleanUp() {
+	err := os.RemoveAll("tmp")
+	if err != nil {
+		log.Fatalln("Temp directory not cleaned up. You may need to manually remove the ./cmd dir.")
+	}
+}
+
 // TestCommand mocks a repository and clones it locally. It then performs a series of steps
 // that determine if the function Command is working as expected.
 func TestCommand(t *testing.T) {
-	// Setup test by creating mock repo and cloning locally.
+	// Setup test by creating mock repo and cloning locally. Defer cleans up the tmp dir.
 	t.Parallel()
+	defer cleanUp()
 
+	// Create mock repository for first tests.
 	repoDir, tree := createMock()
 
 	// Should fail if a command with len == 0 is used in argument.
@@ -60,6 +70,7 @@ func TestCommand(t *testing.T) {
 		t.Error("Unable to execute command when loop == true")
 	}
 
+	// Walk all directories in the repository and look for existance of file.
 	_ = filepath.Walk(repoDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			t.Error("Unable to walk the tree. Fail.")
@@ -72,18 +83,20 @@ func TestCommand(t *testing.T) {
 		}
 		return nil
 	})
-	// test: if loop == false it creates only one file
+
+	// Create another mock repository for further testing.
 	repoDir, tree = createMock()
+	// Create temp file to look for.
 	filePath := repoDir + "/cmd/file.md"
 
-	err = Command(repoDir, "touch file.md", tree, true)
+	// Set loop to false and ensure command is run once.
+	err = Command(repoDir, "touch file.md", tree, false)
 	if err != nil {
 		t.Error("Unable to run command when loop == false")
 	}
 
-	fmt.Println(filePath)
-	_, err = os.Stat(filePath)
-	if os.IsExist(err) {
+	// Check that file.md doesn't exist. If it does the loop argument must be set to true.
+	if _, err := os.Stat(filePath); err == nil {
 		t.Error("File exists where it shouldn't; want no file.md, got file.md")
 	}
 
