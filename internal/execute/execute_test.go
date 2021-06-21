@@ -12,7 +12,7 @@ import (
 	local "github.com/ministryofjustice/cloud-platform-git-xargs/internal/git"
 )
 
-// mockRepo uses the a relatively small repository to test against.
+// mockRepo uses a relatively small repository to test against.
 func mockRepo() (r *github.Repository) {
 	org := "ministryofjustice"
 	repo := "cloud-platform-cli"
@@ -51,7 +51,6 @@ func cleanUp() {
 // TestCommand mocks a repository and clones it locally. It then performs a series of steps
 // that determine if the function Command is working as expected.
 func TestCommand(t *testing.T) {
-	// Setup test by creating mock repo and cloning locally. Defer cleans up the tmp dir.
 	t.Parallel()
 	defer cleanUp()
 
@@ -86,7 +85,6 @@ func TestCommand(t *testing.T) {
 
 	// Create another mock repository for further testing.
 	repoDir, tree = createMock()
-	// Create temp file to look for.
 	filePath := repoDir + "/cmd/file.md"
 
 	// Set loop to false and ensure command is run once.
@@ -100,5 +98,9 @@ func TestCommand(t *testing.T) {
 		t.Error("File exists where it shouldn't; want no file.md, got file.md")
 	}
 
-	// test: if I pass a bad command, it fails.
+	// Send a false command and expect a failure.
+	err = Command(repoDir, "NOTACOMMAND", tree, false)
+	if err == nil {
+		t.Error("A command that should of failed, passed; want error, got success.")
+	}
 }
