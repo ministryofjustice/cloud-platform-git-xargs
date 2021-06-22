@@ -52,6 +52,7 @@ func cleanUp() {
 // to true and false.
 func TestCommandLoop(t *testing.T) {
 	defer cleanUp()
+	t.Parallel()
 
 	repoDir, tree := createMock()
 	filePath := repoDir + "/cmd/file.md"
