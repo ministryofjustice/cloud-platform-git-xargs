@@ -1,3 +1,4 @@
 .env
 *tmp*
 cloud-platform-git-xargs
+DS_Store
