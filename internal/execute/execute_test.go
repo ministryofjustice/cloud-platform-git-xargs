@@ -48,28 +48,32 @@ func cleanUp() {
 	}
 }
 
-// TestCommand mocks a repository and clones it locally. It then performs a series of steps
-// that determine if the function Command is working as expected.
-func TestCommand(t *testing.T) {
-	t.Parallel()
+// TestCommandLoop will check to see if the loop bool is working when set
+// to true and false.
+func TestCommandLoop(t *testing.T) {
 	defer cleanUp()
 
-	// Create mock repository for first tests.
 	repoDir, tree := createMock()
+	filePath := repoDir + "/cmd/file.md"
 
-	// Should fail if a command with len == 0 is used in argument.
-	err := Command(repoDir, "", tree, false)
-	if err == nil {
-		t.Error("When provided with an empty string; want fail, got continue")
+	// Set loop to false and ensure command is run once and that the file is only
+	// created in a single dir. If it exists in a child dir it'll fail.
+	err := Command(repoDir, "touch file.md", tree, false)
+	if err != nil {
+		t.Error("Unable to run command when loop == false")
 	}
 
-	// Will pass if a file called file.md exists in each directory.
+	if _, err := os.Stat(filePath); err == nil {
+		t.Error("File exists where it shouldn't; want no file.md, got file.md")
+	}
+
+	// Set loop to true. Will pass if a file called file.md exists in each directory.
 	err = Command(repoDir, "touch file.md", tree, true)
 	if err != nil {
 		t.Error("Unable to execute command when loop == true")
 	}
 
-	// Walk all directories in the repository and look for existance of file.
+	// Walk all directories in the repository and look for existance of file in each dir.
 	_ = filepath.Walk(repoDir, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			t.Error("Unable to walk the tree. Fail.")
@@ -82,20 +86,19 @@ func TestCommand(t *testing.T) {
 		}
 		return nil
 	})
+}
 
-	// Create another mock repository for further testing.
-	repoDir, tree = createMock()
-	filePath := repoDir + "/cmd/file.md"
+// TestInvalidCommand tests whether sending an invalid command is handled.
+func TestInvalidCommand(t *testing.T) {
+	defer cleanUp()
 
-	// Set loop to false and ensure command is run once.
-	err = Command(repoDir, "touch file.md", tree, false)
-	if err != nil {
-		t.Error("Unable to run command when loop == false")
-	}
+	// Create mock repository for first tests.
+	repoDir, tree := createMock()
 
-	// Check that file.md doesn't exist. If it does the loop argument must be set to true.
-	if _, err := os.Stat(filePath); err == nil {
-		t.Error("File exists where it shouldn't; want no file.md, got file.md")
+	// Send an empty command and expect a failure.
+	err := Command(repoDir, "", tree, false)
+	if err == nil {
+		t.Error("When provided with an empty string; want fail, got continue")
 	}
 
 	// Send a false command and expect a failure.
