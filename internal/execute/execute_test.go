@@ -2,59 +2,20 @@ package execute
 
 import (
 	"io/fs"
-	"log"
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/go-git/go-git/v5"
-	"github.com/google/go-github/v35/github"
-	local "github.com/ministryofjustice/cloud-platform-git-xargs/internal/git"
+	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/helper"
 )
-
-// mockRepo uses a relatively small repository to test against.
-func mockRepo() (r *github.Repository) {
-	org := "ministryofjustice"
-	repo := "cloud-platform-cli"
-
-	url := "https://github.com/" + org + "/" + repo
-
-	r = &github.Repository{
-		Name:     &repo,
-		CloneURL: &url,
-	}
-
-	return
-}
-
-// createMock simply executes the mockRepo function call making it much
-// easier to read.
-func createMock() (repoDir string, tree *git.Worktree) {
-	repo := mockRepo()
-	client := github.NewClient(nil)
-
-	repoDir, localRepo, _ := local.Clone(repo, client)
-
-	tree, _ = localRepo.Worktree()
-
-	return
-}
-
-// cleanUp simply removes the directory created by the Clone function.
-func cleanUp() {
-	err := os.RemoveAll("tmp")
-	if err != nil {
-		log.Fatalln("Temp directory not cleaned up. You may need to manually remove the ./cmd dir.")
-	}
-}
 
 // TestCommandLoop will check to see if the loop bool is working when set
 // to true and false.
 func TestCommandLoop(t *testing.T) {
-	defer cleanUp()
+	defer helper.CleanUpRepo()
 	t.Parallel()
 
-	repoDir, tree := createMock()
+	repoDir, tree := helper.CreateMock()
 	filePath := repoDir + "/cmd/file.md"
 
 	// Set loop to false and ensure command is run once and that the file is only
@@ -91,10 +52,10 @@ func TestCommandLoop(t *testing.T) {
 
 // TestInvalidCommand tests whether sending an invalid command is handled.
 func TestInvalidCommand(t *testing.T) {
-	defer cleanUp()
+	defer helper.CleanUpRepo()
 
 	// Create mock repository for first tests.
-	repoDir, tree := createMock()
+	repoDir, tree := helper.CreateMock()
 
 	// Send an empty command and expect a failure.
 	err := Command(repoDir, "", tree, false)
