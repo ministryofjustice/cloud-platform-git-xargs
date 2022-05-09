@@ -7,6 +7,7 @@ require (
 	github.com/go-git/go-git/v5 v5.3.0
 	github.com/google/go-github/v35 v35.1.0
 	github.com/gopherjs/gopherjs v0.0.0-20200217142428-fce0ec30dd00 // indirect
+	github.com/migueleliasweb/go-github-mock v0.0.8
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/smartystreets/assertions v1.1.0 // indirect
 	github.com/spf13/afero v1.2.2 // indirect
@@ -15,5 +16,4 @@ require (
 	github.com/stretchr/testify v1.6.1 // indirect
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58
-	golang.org/x/sys v0.0.0-20210330210617-4fbd30eecc44 // indirect
 )
