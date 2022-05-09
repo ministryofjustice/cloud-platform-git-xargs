@@ -12,8 +12,6 @@ import (
 func FetchRepositories(client *github.Client, org, blob string) ([]*github.Repository, error) {
 	ctx := context.Background()
 	opt := &github.RepositoryListByOrgOptions{
-		Sort:        "full_name",
-		Type:        "public",
 		ListOptions: github.ListOptions{PerPage: 10},
 	}
 
@@ -26,19 +24,16 @@ func FetchRepositories(client *github.Client, org, blob string) ([]*github.Repos
 			return nil, err
 		}
 
-		allRepos = append(allRepos, repos...)
+		for _, repo := range repos {
+			if strings.Contains(*repo.Name, blob) {
+				allRepos = append(allRepos, repo)
+			}
+		}
 		if resp.NextPage == 0 {
 			break
 		}
 		opt.Page = resp.NextPage
 	}
 
-	var list []*github.Repository
-	for _, repo := range allRepos {
-		if strings.Contains(*repo.FullName, blob) {
-			list = append(list, repo)
-		}
-	}
-
-	return list, nil
+	return allRepos, nil
 }
