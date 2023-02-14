@@ -27,6 +27,7 @@ import (
 	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/execute"
 	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/get"
 	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/git"
+	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/terraform"
 )
 
 // All passed via flags
@@ -87,6 +88,57 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 	},
 }
 
+// bumpTfVersionCmd represents the bumpTfVersion command. This command, with arguments,
+// will enable the user to bump given terraform version in verstions.tf against a collection of repositories.
+// Commit that change and then create a pull request.
+var bumpTfVersionCmd = &cobra.Command{
+	Use:   "bumpTfVersionCmd",
+	Short: "Bump to the given terraform version on a collection of repositories.",
+	Long: `Given a GitHub organisation and a blob of repository names
+pull the repository down locally, amend the versions.tf to given terraform version, then PR back
+to main, approve the PR and create a release for that repository.
+
+An example of this would be:
+
+cloud-platform-git-xargs bumpTfVersionCmd --version "1.2.9" \
+							 --organisation "github" \
+							 --repository "github"`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// You must set a GITHUB_OAUTH_TOKEN environment variable
+		token := os.Getenv("GITHUB_OAUTH_TOKEN")
+		if os.Getenv("GITHUB_OAUTH_TOKEN") == "" {
+			return errors.New("you must have the GITHUB_OAUTH_TOKEN env var")
+		}
+
+		// Create GH client using your personal access token
+		client := GitHubClient(token)
+
+		// Get all repository names containing value to repos variable/flag
+		repos, err := get.FetchRepositories(client, org, repos)
+		if err != nil {
+			return err
+		}
+
+		// Loop over all repositories, run a command, commit the change and
+		// create a pull request. Decided to use errgroup instead of waitgroups
+		// as it was easier to understand.
+		g := new(errgroup.Group)
+		for _, repo := range repos {
+			g.Go(func() error {
+				err = terraform.BumpTfVersion(repo, client, tfVersion)
+				if err != nil {
+					return err
+				}
+				return err
+			})
+		}
+		if err := g.Wait(); err != nil {
+			fmt.Println("Error processing repositories", err)
+		}
+		return nil
+	},
+}
+
 func processRepo(repo *github.Repository, client *github.Client) error {
 	// Clone repository to local disk
 	repoDir, localRepo, err := git.Clone(repo, client)
@@ -128,8 +180,61 @@ func processRepo(repo *github.Repository, client *github.Client) error {
 	return nil
 }
 
+func bumpTfVersionRepo(repo *github.Repository, client *github.Client, tfVersion string) error {
+	// Clone repository to local disk
+	repoDir, localRepo, err := git.Clone(repo, client)
+	if err != nil {
+		return err
+	}
+
+	// Get HEAD ref from repository
+	ref, err := localRepo.Head()
+	if err != nil {
+		return err
+	}
+
+	// Get the worktree for the local repository
+	tree, err := localRepo.Worktree()
+	if err != nil {
+		return err
+	}
+
+	// Create local branch
+	branch, err := git.Checkout(client, ref, tree, repo, localRepo)
+	if err != nil {
+		return err
+	}
+
+	// Execute command
+	// err = execute.Command(repoDir, command, tree, loop)
+	// if err != nil {
+	// 	return err
+	// }
+	err = terraform.BumpTfVersion(repoDir, tfVersion, tree, loop)
+	if err != nil {
+		return err
+	}
+
+	// As long as skipCommit isn't true, stage, push and pr changes
+	if !skipCommit {
+		err = git.PushChanges(client, branch.String(), tree, repoDir, message, localRepo, repo)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(bumpTfVersionCmd)
+
+	bumpTfVersionCmd.Flags().StringVarP(&tfVersion, "version", "v", "1.2.9", "the terraform version you'd like to bump to")
+	bumpTfVersionCmd.Flags().StringVarP(&repos, "repository", "r", "cloud-platform-environments", "a blob of the repository name i.e. cloud-platform-terraform")
+	bumpTfVersionCmd.Flags().StringVarP(&org, "organisation", "o", "ministryofjustice", "organisation of the repository i.e. ministryofjustice")
+	bumpTfVersionCmd.Flags().StringVarP(&message, "commit", "m", "Bump terraform version on repository", "the commit message you'd like to make")
+	bumpTfVersionCmd.Flags().BoolVarP(&skipCommit, "skip-commit", "s", false, "whether or not you want to create a commit and PR.")
+	bumpTfVersionCmd.Flags().BoolVarP(&loop, "loop-dir", "l", false, "if you wish to execute the command on every directory in repository.")
 
 	runCmd.Flags().StringVarP(&command, "command", "c", "", "the command you'd like to execute i.e. touch file")
 	runCmd.Flags().StringVarP(&repos, "repository", "r", "cloud-platform-environments", "a blob of the repository name i.e. cloud-platform-terraform")
