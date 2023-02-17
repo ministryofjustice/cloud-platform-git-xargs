@@ -37,6 +37,7 @@ func TestFetchRepositories(t *testing.T) {
 		client *github.Client
 		org    string
 		blob   string
+		file   string
 	}
 	tests := []struct {
 		name    string
@@ -50,6 +51,7 @@ func TestFetchRepositories(t *testing.T) {
 				client: github.NewClient(mockedClient),
 				org:    "test",
 				blob:   "repo",
+				file:   "",
 			},
 			want: []*github.Repository{
 				{
@@ -73,13 +75,14 @@ func TestFetchRepositories(t *testing.T) {
 				client: github.NewClient(mockedClient),
 				org:    "test",
 				blob:   "obviouslyWrong",
+				file:   "",
 			},
 			want: nil,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FetchRepositories(tt.args.client, tt.args.org, tt.args.blob)
+			got, err := FetchRepositories(tt.args.client, tt.args.org, tt.args.blob, tt.args.file)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("FetchRepositories() error = %v, wantErr %v", err, tt.wantErr)
 				return
