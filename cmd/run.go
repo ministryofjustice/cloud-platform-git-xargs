@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,7 +22,6 @@ import (
 
 	"github.com/google/go-github/v35/github"
 	"github.com/spf13/cobra"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/execute"
 	"github.com/ministryofjustice/cloud-platform-git-xargs/internal/get"
@@ -34,6 +33,7 @@ var (
 	command, message string
 	repos, org       string
 	skipCommit, loop bool
+	file             string
 )
 
 // runCmd represents the run command. This command, with arguments,
@@ -61,27 +61,23 @@ cloud-platform-git-xargs run --command "touch blankfile" \
 		// Create GH client using your personal access token
 		client := GitHubClient(token)
 
+		fmt.Println("Fetching repositories...")
+
 		// Get all repository names containing value to repos variable/flag
-		repos, err := get.FetchRepositories(client, org, repos)
+		repos, err := get.FetchRepositories(client, org, repos, file)
 		if err != nil {
 			return err
 		}
 
+		fmt.Println("Repositories fetched.")
 		// Loop over all repositories, run a command, commit the change and
 		// create a pull request. Decided to use errgroup instead of waitgroups
 		// as it was easier to understand.
-		g := new(errgroup.Group)
 		for _, repo := range repos {
-			g.Go(func() error {
-				err = processRepo(repo, client)
-				if err != nil {
-					return err
-				}
+			err = processRepo(repo, client)
+			if err != nil {
 				return err
-			})
-		}
-		if err := g.Wait(); err != nil {
-			fmt.Println("Error processing repositories", err)
+			}
 		}
 		return nil
 	},
@@ -91,38 +87,38 @@ func processRepo(repo *github.Repository, client *github.Client) error {
 	// Clone repository to local disk
 	repoDir, localRepo, err := git.Clone(repo, client)
 	if err != nil {
-		return err
+		return fmt.Errorf("error cloning repository: %w", err)
 	}
 
 	// Get HEAD ref from repository
 	ref, err := localRepo.Head()
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting HEAD ref: %w", err)
 	}
 
 	// Get the worktree for the local repository
 	tree, err := localRepo.Worktree()
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting worktree: %w", err)
 	}
 
 	// Create local branch
-	branch, err := git.Checkout(client, ref, tree, repo, localRepo)
+	_, err = git.Checkout(client, ref, tree, repo, localRepo)
 	if err != nil {
-		return err
+		return fmt.Errorf("error creating local branch: %w", err)
 	}
 
 	// Execute command
 	err = execute.Command(repoDir, command, tree, loop)
 	if err != nil {
-		return err
+		return fmt.Errorf("error executing command: %w", err)
 	}
 
 	// As long as skipCommit isn't true, stage, push and pr changes
 	if !skipCommit {
-		err = git.PushChanges(client, branch.String(), tree, repoDir, message, localRepo, repo)
+		err = git.PushChanges(client, "update-tf-action", tree, repoDir, message, localRepo, repo)
 		if err != nil {
-			return err
+			return fmt.Errorf("error pushing changes: %w", err)
 		}
 	}
 	return nil
@@ -132,9 +128,10 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 
 	runCmd.Flags().StringVarP(&command, "command", "c", "", "the command you'd like to execute i.e. touch file")
-	runCmd.Flags().StringVarP(&repos, "repository", "r", "cloud-platform-environments", "a blob of the repository name i.e. cloud-platform-terraform")
+	runCmd.Flags().StringVarP(&repos, "repository", "r", "", "a blob of the repository name i.e. cloud-platform-terraform")
 	runCmd.Flags().StringVarP(&org, "organisation", "o", "ministryofjustice", "organisation of the repository i.e. ministryofjustice")
 	runCmd.Flags().StringVarP(&message, "commit", "m", "perform command on repository", "the commit message you'd like to make")
 	runCmd.Flags().BoolVarP(&skipCommit, "skip-commit", "s", false, "whether or not you want to create a commit and PR.")
 	runCmd.Flags().BoolVarP(&loop, "loop-dir", "l", false, "if you wish to execute the command on every directory in repository.")
+	runCmd.Flags().StringVarP(&file, "file", "f", "", "path to file containing list of repositories to process.")
 }
