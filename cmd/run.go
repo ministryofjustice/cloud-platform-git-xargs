@@ -118,7 +118,7 @@ func processRepo(repo *github.Repository, client *github.Client) error {
 	if !skipCommit {
 		err = git.PushChanges(client, "update-tf-action", tree, repoDir, message, localRepo, repo)
 		if err != nil {
-			return fmt.Errorf("error pushing changes: %w", err)
+			return fmt.Errorf("error pushing changes to %s: %w", repo.GetName(), err)
 		}
 	}
 	return nil
