@@ -71,7 +71,7 @@ func PushChanges(client *github.Client, branch string, tree *git.Worktree, repo,
 // Checkout takes a GitHub client, a git reference and tree, along with local and remote repository.
 // It will create a branch with the hardcoded name 'update', and will output a new git reference.
 func Checkout(client *github.Client, ref *plumbing.Reference, tree *git.Worktree, remote *github.Repository, local *git.Repository) (plumbing.ReferenceName, error) {
-	branchName := plumbing.NewBranchReferenceName("update")
+	branchName := plumbing.NewBranchReferenceName("update-tf-action")
 
 	create := &git.CheckoutOptions{
 		Hash:   ref.Hash(),

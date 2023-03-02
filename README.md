@@ -31,7 +31,7 @@ You must have valid GitHub token. See the guide on [GitHub Personal access token
 export GITHUB_OAUTH_TOKEN=<your-personal-access-token>
 ```
 
-* if you don't have the environment variable set, the app will tell you to set it.
+- if you don't have the environment variable set, the app will tell you to set it.
 
 Using the example in the problem statement, you'd run:
 
@@ -45,8 +45,8 @@ cloud-platform-git-xargs run -command "terraform 0.13upgrade" \
 
 This performs the following:
 
-- Identify all repositories in the `ministryofjustice` organisation that contain the name `cloud-platform-terraform` (an example of this would be `cloud-platform-terraform-rds-instance`). 
-- Will clone each repository down to a temporary directory called `tmp/`. 
+- Identify all repositories in the `ministryofjustice` organisation that contain the name `cloud-platform-terraform` (an example of this would be `cloud-platform-terraform-rds-instance`).
+- Will clone each repository down to a temporary directory called `tmp/`.
 - On each directory, run the `terraform 0.13upgrade` command.
 - Commit using the message "Upgrade Terraform HCL to Terraform 0.13.x".
 - Push a branch named `update` to the repository on GitHub.
@@ -58,14 +58,16 @@ This performs the following:
 Flags:
   -c, --command string        the command you'd like to execute i.e. touch file
   -m, --commit string         the commit message you'd like to make (default "perform command on repository")
+  -f, --file string           path to file containing list of repositories to process.
   -h, --help                  help for run
   -l, --loop-dir              if you wish to execute the command on every directory in repository.
   -o, --organisation string   organisation of the repository i.e. ministryofjustice (default "ministryofjustice")
-  -r, --repository string     a blob of the repository name i.e. cloud-platform-terraform (default "cloud-platform-environments")
+  -r, --repository string     a blob of the repository name i.e. cloud-platform-terraform
   -s, --skip-commit           whether or not you want to create a commit and PR.
 
 Global Flags:
       --config string   config file (default is $HOME/.cloud-platform-git-xargs.yaml)
+
 ```
 
 ## How to install it
@@ -88,6 +90,7 @@ NB: You may need to manually open the file to override OSX restrictions against 
 You will need Go installed. The makefile contains a build, test and release command. To release you must change the release variable to the latest tag and then run `make release`.
 
 There are GitHub actions in this repository that will:
+
 - build and release on new tag
 - test code on PR and push
 - format all codebase
