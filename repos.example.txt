@@ -1,0 +1,8 @@
+cloud-platform-terraform-starter-pack
+cloud-platform-terraform-kops
+cloud-platform-terraform-amp
+cloud-platform-terraform-aws-sso
+cloud-platform-terraform-global-resources-auth0
+cloud-platform-terraform-kuberhealthy
+cloud-platform-terraform-secrets-manager
+cloud-platform-terraform-efs-csi
