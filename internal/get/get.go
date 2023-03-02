@@ -110,5 +110,5 @@ func getReposFromOrg(client *github.Client, ctx context.Context, org, blob strin
 		opt.Page = resp.NextPage
 	}
 
-	return nil, nil
+	return allRepos, nil
 }
